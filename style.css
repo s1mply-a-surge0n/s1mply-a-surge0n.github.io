@@ -1,0 +1,179 @@
+body {
+  background: #f8f9fa;
+  font-family:
+    "Segoe UI",
+    Tahoma,
+    Geneva,
+    Verdana,
+    sans-serif;
+}
+
+.header-title {
+  font-weight: 700;
+  color: #2c3e50;
+}
+
+.sections-wrapper {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.section-card {
+  background: white;
+  border-radius: 16px;
+  padding: 18px;
+  border: 1px solid #e9ecef;
+  box-shadow: 0 5px 18px rgba(0,0,0,.05);
+}
+
+.section-title {
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 16px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #eee;
+  color: #0d6efd;
+}
+
+.seat-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.seat {
+  width: 60px;
+  height: 60px;
+  border-radius: 10px;
+
+  display: flex;
+  flex-direction: column;
+
+  align-items: center;
+  justify-content: center;
+
+  cursor: pointer;
+
+  border: 2px solid transparent;
+
+  transition: .15s;
+}
+
+.seat:hover {
+  transform: translateY(-2px);
+}
+
+.seat.available {
+  background: #e8f5e9;
+  color: #2e7d32;
+  border-color: #a5d6a7;
+}
+
+.seat.occupied {
+  background: #ffebee;
+  color: #c62828;
+  border-color: #ef9a9a;
+}
+
+.seat-number {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.seat-name {
+  font-size: 10px;
+  max-width: 52px;
+
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.legend {
+  width: 16px;
+  height: 16px;
+
+  display: inline-block;
+
+  border-radius: 4px;
+
+  vertical-align: middle;
+
+  margin-right: 5px;
+}
+
+.available-legend {
+  background: #e8f5e9;
+  border: 1px solid #a5d6a7;
+}
+
+.occupied-legend {
+  background: #ffebee;
+  border: 1px solid #ef9a9a;
+}
+
+
+/* ADMIN */
+
+.admin-section-item {
+  border: 1px solid #dee2e6;
+  border-radius: 10px;
+
+  padding: 12px;
+
+  margin-bottom: 8px;
+
+  cursor: pointer;
+
+  background: white;
+}
+
+.admin-section-item.active {
+  border-color: #0d6efd;
+  background: #f0f6ff;
+}
+
+.admin-editor {
+  border: 1px solid #dee2e6;
+  border-radius: 12px;
+
+  padding: 20px;
+
+  background: #fafafa;
+}
+
+.admin-preview {
+  margin-top: 20px;
+  padding: 20px;
+
+  background: white;
+
+  border: 1px solid #ddd;
+  border-radius: 12px;
+
+  overflow: auto;
+}
+
+.preview-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.preview-seat {
+  width: 55px;
+  height: 55px;
+
+  border-radius: 8px;
+
+  background: #e8f5e9;
+
+  border: 1px solid #a5d6a7;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 12px;
+}
