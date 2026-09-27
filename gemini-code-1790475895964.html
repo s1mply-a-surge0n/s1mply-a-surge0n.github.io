@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sơ Đồ Chỗ Ngồi - Đồng Bộ Google Sheet</title>
+  <!-- Nhập Bootstrap 5 để giao diện đẹp và tương thích điện thoại -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      background-color: #f4f6f9;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      padding-bottom: 50px;
+    }
+    .header-title {
+      font-weight: 700;
+      color: #2c3e50;
+    }
+    .stage {
+      background: linear-gradient(135deg, #4b6cb7, #182848);
+      color: white;
+      text-align: center;
+      padding: 12px;
+      border-radius: 8px;
+      margin: 20px auto 30px auto;
+      font-weight: bold;
+      letter-spacing: 2px;
+      max-width: 600px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .seat-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr); /* 6 cột ghế */
+      gap: 12px;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+    .seat {
+      aspect-ratio: 1;
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border: 2px solid transparent;
+      padding: 6px;
+      text-align: center;
+      user-select: none;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    /* Trạng thái Ghế Trống */
+    .seat.available {
+      background-color: #e8f5e9;
+      color: #2e7d32;
+      border-color: #a5d6a7;
+    }
+    .seat.available:hover {
+      background-color: #c8e6c9;
+      transform: translateY(-3px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    /* Trạng thái Ghế Đã Có Người Đặt */
+    .seat.occupied {
+      background-color: #ffebee;
+      color: #c62828;
+      border-color: #ef9a9a;
+    }
+    .seat.occupied:hover {
+      background-color: #ffcdd2;
+    }
+    .seat-number {
+      font-weight: 700;
+      font-size: 1.1rem;
+    }
+    .seat-name {
+      font-size: 0.75rem;
+      margin-top: 4px;
+      line-height: 1.1;
+      word-break: break-word;
+      font-weight: 600;
+    }
+    .legend-box {
+      width: 20px;
+      height: 20px;
+      border-radius: 4px;
+      display: inline-block;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container mt-4">
+    <h2 class="text-center header-title">SƠ ĐỒ CHỌN CHỖ NGỒI</h2>
+    <p class="text-center text-muted">Bấm vào ghế trống để đăng ký chỗ ngồi của bạn</p>
+
+    <!-- Sân khấu / Màn hình -->
+    <div class="stage">SÂN KHẤU / MÀN HÌNH CHÍNH</div>
+
+    <!-- Khung Chú Thích -->
+    <div class="d-flex justify-content-center mb-4">
+      <div class="me-4">
+        <span class="legend-box" style="background-color: #e8f5e9; border: 1px solid #a5d6a7;"></span>
+        <span>Ghế trống</span>
+      </div>
+      <div>
+        <span class="legend-box" style="background-color: #ffebee; border: 1px solid #ef9a9a;"></span>
+        <span>Đã có người đặt</span>
+      </div>
+    </div>
+
+    <!-- Nút Làm Mới / Cập Nhật -->
+    <div class="text-center mb-3">
+      <button class="btn btn-outline-primary btn-sm" onclick="loadSeatsData()">
+        🔄 Tải lại danh sách
+      </button>
+    </div>
+
+    <!-- Thông báo trạng thái -->
+    <div id="statusMsg" class="alert alert-info text-center d-none" style="max-width: 600px; margin: 0 auto 20px auto;"></div>
+
+    <!-- Sơ Đồ Ghế (Được vẽ bằng JS) -->
+    <div class="seat-grid" id="seatGrid"></div>
+  </div>
+
+  <script>
+    // =========================================================================
+    // BƯỚC QUAN TRỌNG: Dán Web App URL từ Google Apps Script của bạn vào đây:
+    // =========================================================================
+    const GOOGLE_SCRIPT_URL = "DÁN_LINK_WEB_APP_CỦA_BẠN_VÀO_ĐÂY";
+
+    // Cấu hình sơ đồ ghế (5 Hàng: A, B, C, D, E và 6 Cột: 1 đến 6)
+    const ROWS = ["A", "B", "C", "D", "E"];
+    const COLS = 6;
+
+    let seatsData = {}; // Lưu trữ danh sách ghế từ Google Sheet
+
+    // Tự động tải dữ liệu khi vừa vào trang web
+    document.addEventListener("DOMContentLoaded", () => {
+      renderGrid();
+      loadSeatsData();
+    });
+
+    // 1. Hàm vẽ khung ghế mặc định
+    function renderGrid() {
+      const grid = document.getElementById("seatGrid");
+      grid.innerHTML = "";
+
+      ROWS.forEach(row => {
+        for (let col = 1; col <= COLS; col++) {
+          const seatId = `${row}${col}`;
+          
+          const seatEl = document.createElement("div");
+          seatEl.id = `seat-${seatId}`;
+          seatEl.className = "seat available";
+          seatEl.onclick = () => handleSeatClick(seatId);
+
+          seatEl.innerHTML = `
+            <div class="seat-number">${seatId}</div>
+            <div class="seat-name" id="name-${seatId}">Trống</div>
+          `;
+
+          grid.appendChild(seatEl);
+        }
+      });
+    }
+
+    // 2. Tải danh sách ghế đã đặt từ Google Sheet
+    async function loadSeatsData() {
+      if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.includes("DÁN_LINK")) {
+        showStatus("⚠️ Bạn chưa dán link Google Apps Script vào file index.html!", "warning");
+        return;
+      }
+
+      showStatus("⏳ Đang tải dữ liệu chỗ ngồi từ Google Sheet...", "info");
+
+      try {
+        const res = await fetch(GOOGLE_SCRIPT_URL);
+        const data = await res.json();
+
+        if (data.status === "success") {
+          seatsData = data.seats || {};
+          updateUI();
+          showStatus("✅ Đã cập nhật dữ liệu mới nhất!", "success");
+          setTimeout(hideStatus, 2000); // Tự ẩn thông báo sau 2s
+        } else {
+          showStatus("❌ Lỗi khi lấy dữ liệu từ Google Sheet!", "danger");
+        }
+      } catch (err) {
+        console.error(err);
+        showStatus("❌ Lỗi kết nối! Hãy kiểm tra lại link Google Apps Script.", "danger");
+      }
+    }
+
+    // 3. Cập nhật màu sắc & Tên lên sơ đồ ghế
+    function updateUI() {
+      ROWS.forEach(row => {
+        for (let col = 1; col <= COLS; col++) {
+          const seatId = `${row}${col}`;
+          const seatEl = document.getElementById(`seat-${seatId}`);
+          const nameEl = document.getElementById(`name-${seatId}`);
+
+          if (seatsData[seatId] && seatsData[seatId].trim() !== "") {
+            seatEl.className = "seat occupied";
+            nameEl.textContent = seatsData[seatId];
+          } else {
+            seatEl.className = "seat available";
+            nameEl.textContent = "Trống";
+          }
+        }
+      });
+    }
+
+    // 4. Xử lý sự kiện khi bấm chọn ghế
+    function handleSeatClick(seatId) {
+      const currentName = seatsData[seatId] || "";
+
+      if (currentName) {
+        // Ghế đã có người chọn -> Hỏi có muốn hủy không
+        const confirmCancel = confirm(`Ghế ${seatId} hiện đã do "${currentName}" đăng ký.\n\nBạn có muốn HỦY đăng ký ghế này không?`);
+        if (confirmCancel) {
+          cancelSeat(seatId);
+        }
+      } else {
+        // Ghế trống -> Yêu cầu nhập tên
+        const userName = prompt(`Bạn đang chọn GHẾ ${seatId}.\nVui lòng nhập Tên/Họ tên của bạn:`);
+        if (userName && userName.trim() !== "") {
+          bookSeat(seatId, userName.trim());
+        }
+      }
+    }
+
+    // 5. Gửi thông tin ĐẶT GHẾ lên Google Sheet
+    async function bookSeat(seatId, name) {
+      showStatus(`⏳ Đang lưu vị trí ${seatId} cho "${name}"...`, "info");
+
+      try {
+        const res = await fetch(GOOGLE_SCRIPT_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({
+            action: "book",
+            seatId: seatId,
+            name: name
+          })
+        });
+
+        const data = await res.json();
+        if (data.status === "success") {
+          seatsData[seatId] = name;
+          updateUI();
+          showStatus(`🎉 Đã đặt thành công ghế ${seatId}!`, "success");
+          setTimeout(hideStatus, 2500);
+        } else {
+          showStatus("❌ Không thể lưu thông tin. Thử lại sau!", "danger");
+        }
+      } catch (err) {
+        console.error(err);
+        showStatus("❌ Lỗi kết nối khi gửi dữ liệu!", "danger");
+      }
+    }
+
+    // 6. Gửi thông tin HỦY GHẾ lên Google Sheet
+    async function cancelSeat(seatId) {
+      showStatus(`⏳ Đang hủy đặt ghế ${seatId}...`, "info");
+
+      try {
+        const res = await fetch(GOOGLE_SCRIPT_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({
+            action: "cancel",
+            seatId: seatId
+          })
+        });
+
+        const data = await res.json();
+        if (data.status === "success") {
+          delete seatsData[seatId];
+          updateUI();
+          showStatus(`🗑️ Đã hủy ghế ${seatId}!`, "success");
+          setTimeout(hideStatus, 2500);
+        } else {
+          showStatus("❌ Không thể hủy ghế. Thử lại sau!", "danger");
+        }
+      } catch (err) {
+        console.error(err);
+        showStatus("❌ Lỗi kết nối khi hủy ghế!", "danger");
+      }
+    }
+
+    // Các hàm phụ trợ hiển thị thông báo
+    function showStatus(msg, type) {
+      const el = document.getElementById("statusMsg");
+      el.className = `alert alert-${type} text-center`;
+      el.textContent = msg;
+      el.classList.remove("d-none");
+    }
+
+    function hideStatus() {
+      const el = document.getElementById("statusMsg");
+      el.classList.add("d-none");
+    }
+  </script>
+</body>
+</html>
