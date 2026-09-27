@@ -1,29 +1,46 @@
 const API_URL =
   "https://script.google.com/macros/s/AKfycbzpoHExr9Oi82mIoxGQkN2MJjWTpPJjbEbqY-6w1FOsdpMWXyTvxzoCroCuURrI3mgH/exec";
 
+/*
+ * ==================================================
+ * GLOBAL DATA
+ * ==================================================
+ */
 
 let appData = {
+
   config: [],
+
   seats: {}
+
 };
 
-let adminPassword = "";
-let selectedSectionId = null;
+
+let adminPassword =
+  "";
 
 
-/* =====================================================
-   INIT
-===================================================== */
+/*
+ * ==================================================
+ * INIT
+ * ==================================================
+ */
 
 document.addEventListener(
   "DOMContentLoaded",
-  loadData
+  () => {
+
+    loadData();
+
+  }
 );
 
 
-/* =====================================================
-   LOAD DATA
-===================================================== */
+/*
+ * ==================================================
+ * LOAD DATA
+ * ==================================================
+ */
 
 async function loadData() {
 
@@ -32,208 +49,448 @@ async function loadData() {
     "info"
   );
 
+
   try {
 
-    const response = await fetch(
-      API_URL + "?action=getData"
-    );
+    const response =
+      await fetch(
+        API_URL +
+        "?action=getData"
+      );
 
-    const data = await response.json();
 
-    if (data.status !== "success") {
-      throw new Error(data.message);
+    const data =
+      await response.json();
+
+
+    if (
+      data.status !==
+      "success"
+    ) {
+
+      throw new Error(
+        data.message ||
+        "Không tải được dữ liệu."
+      );
+
     }
 
-    appData.config = data.config || [];
-    appData.seats = data.seats || {};
 
-    renderSeatMap();
+    appData.config =
+      data.config || [];
 
-    hideStatus();
+
+    appData.seats =
+      data.seats || {};
+
+
+    renderSeats();
+
+
+    showStatus(
+      "Đã cập nhật dữ liệu.",
+      "success"
+    );
+
+
+    setTimeout(
+      hideStatus,
+      1500
+    );
+
 
   } catch (error) {
 
     console.error(error);
 
+
     showStatus(
-      "Không thể kết nối Google Sheet.",
-      "danger"
+      "❌ " +
+      error.message,
+      "error"
     );
+
   }
+
 }
 
 
-/* =====================================================
-   RENDER SEAT MAP
-===================================================== */
+/*
+ * ==================================================
+ * RENDER SEATS
+ * ==================================================
+ */
 
-function renderSeatMap() {
+function renderSeats() {
 
   const container =
     document.getElementById(
-      "sectionsContainer"
+      "sections"
     );
+
 
   container.innerHTML = "";
 
-  const sections = getSections();
+
+  const sections =
+    groupSections(
+      appData.config
+    );
 
 
-  sections.forEach(section => {
+  sections.forEach(
+    section => {
 
-    const card =
-      document.createElement("div");
-
-    card.className = "section-card";
-
-
-    const title =
-      document.createElement("div");
-
-    title.className = "section-title";
-
-    title.textContent =
-      section.name;
-
-    card.appendChild(title);
+      const sectionElement =
+        document.createElement(
+          "div"
+        );
 
 
-    const grid =
-      document.createElement("div");
-
-    grid.className = "seat-grid";
-
-    grid.style.gridTemplateColumns =
-      `repeat(${section.maxCol}, 60px)`;
+      sectionElement.className =
+        "section";
 
 
-    section.items.forEach(item => {
-
-      const seat =
-        document.createElement("div");
-
-      seat.className =
-        "seat available";
-
-      const occupied =
-        appData.seats[item.id];
+      const title =
+        document.createElement(
+          "div"
+        );
 
 
-      if (occupied) {
-
-        seat.className =
-          "seat occupied";
-
-      }
+      title.className =
+        "section-title";
 
 
-      seat.innerHTML = `
-        <div class="seat-number">
-          ${escapeHtml(item.label)}
-        </div>
+      title.textContent =
+        section.name;
 
-        <div class="seat-name">
-          ${
-            occupied
-              ? escapeHtml(occupied.name)
-              : "Trống"
+
+      sectionElement.appendChild(
+        title
+      );
+
+
+      const grid =
+        document.createElement(
+          "div"
+        );
+
+
+      grid.className =
+        "seat-grid";
+
+
+      /*
+       * ------------------------------------------
+       * FIND GRID SIZE
+       * ------------------------------------------
+       */
+
+      const maxCol =
+        Math.max(
+          ...section.seats.map(
+            seat =>
+              Number(seat.col) || 1
+          ),
+          1
+        );
+
+
+      grid.style.gridTemplateColumns =
+        `repeat(${maxCol}, 1fr)`;
+
+
+      /*
+       * ------------------------------------------
+       * SORT SEATS
+       * ------------------------------------------
+       */
+
+      const seats =
+        [...section.seats]
+          .sort(
+            (a, b) => {
+
+              const rowA =
+                Number(a.row) || 0;
+
+              const rowB =
+                Number(b.row) || 0;
+
+              const colA =
+                Number(a.col) || 0;
+
+              const colB =
+                Number(b.col) || 0;
+
+
+              if (
+                rowA !== rowB
+              ) {
+
+                return rowA - rowB;
+
+              }
+
+
+              return colA - colB;
+
+            }
+          );
+
+
+      /*
+       * ------------------------------------------
+       * CREATE SEATS
+       * ------------------------------------------
+       */
+
+      seats.forEach(
+        seat => {
+
+          const seatElement =
+            document.createElement(
+              "div"
+            );
+
+
+          seatElement.className =
+            "seat";
+
+
+          const booking =
+            appData.seats[
+              seat.id
+            ];
+
+
+          if (
+            booking &&
+            booking.name
+          ) {
+
+            seatElement.classList.add(
+              "occupied"
+            );
+
+          } else {
+
+            seatElement.classList.add(
+              "available"
+            );
+
           }
-        </div>
-      `;
 
 
-      seat.onclick = () =>
-        handleSeatClick(item);
+          const number =
+            document.createElement(
+              "div"
+            );
 
 
-      seat.style.gridColumn =
-        item.col;
-
-      seat.style.gridRow =
-        item.row;
+          number.className =
+            "seat-number";
 
 
-      grid.appendChild(seat);
+          number.textContent =
+            seat.label ||
+            `${seat.row}${seat.col}`;
 
-    });
+
+          const name =
+            document.createElement(
+              "div"
+            );
 
 
-    card.appendChild(grid);
+          name.className =
+            "seat-name";
 
-    container.appendChild(card);
 
-  });
+          name.textContent =
+            booking &&
+            booking.name
+              ? booking.name
+              : "Trống";
+
+
+          seatElement.appendChild(
+            number
+          );
+
+
+          seatElement.appendChild(
+            name
+          );
+
+
+          seatElement.onclick =
+            () => {
+
+              handleSeatClick(
+                seat
+              );
+
+            };
+
+
+          grid.appendChild(
+            seatElement
+          );
+
+        }
+      );
+
+
+      sectionElement.appendChild(
+        grid
+      );
+
+
+      container.appendChild(
+        sectionElement
+      );
+
+    }
+  );
 
 }
 
 
-/* =====================================================
-   GROUP SECTIONS
-===================================================== */
+/*
+ * ==================================================
+ * GROUP SECTIONS
+ * ==================================================
+ */
 
-function getSections() {
+function groupSections(
+  config
+) {
 
   const map = {};
 
-  appData.config.forEach(item => {
 
-    if (!map[item.section_id]) {
+  config
+    .filter(
+      item =>
+        item.type === "seat"
+    )
+    .forEach(
+      seat => {
 
-      map[item.section_id] = {
-        id: item.section_id,
-        name: item.section_name,
-        items: [],
-        maxCol: 1
-      };
-
-    }
-
-    map[item.section_id]
-      .items
-      .push(item);
-
-    map[item.section_id].maxCol =
-      Math.max(
-        map[item.section_id].maxCol,
-        Number(item.col)
-      );
-
-  });
+        const sectionId =
+          seat.section_id;
 
 
-  return Object.values(map);
+        if (
+          !map[sectionId]
+        ) {
+
+          map[sectionId] = {
+
+            id:
+              sectionId,
+
+            name:
+              seat.section_name ||
+              sectionId,
+
+            seats: []
+
+          };
+
+        }
+
+
+        map[
+          sectionId
+        ].seats.push(
+          seat
+        );
+
+      }
+    );
+
+
+  return Object.values(
+    map
+  );
 
 }
 
 
-/* =====================================================
-   BOOK / CANCEL
-===================================================== */
+/*
+ * ==================================================
+ * CLICK SEAT
+ * ==================================================
+ */
 
-async function handleSeatClick(item) {
+function handleSeatClick(
+  seat
+) {
 
-  const occupied =
-    appData.seats[item.id];
+  const booking =
+    appData.seats[
+      seat.id
+    ];
 
 
-  if (occupied) {
+  /*
+   * ------------------------------------------
+   * OCCUPIED
+   * ------------------------------------------
+   */
 
-    const confirmCancel =
+  if (
+    booking &&
+    booking.name
+  ) {
+
+    const shouldCancel =
       confirm(
-        `Ghế ${item.label} đang được chọn bởi "${occupied.name}".\n\nHủy ghế này?`
+
+        `Ghế ${
+          seat.label
+        } đang được "${
+          booking.name
+        }" sử dụng.\n\n` +
+
+        `Bạn có muốn hủy ghế này không?`
+
       );
 
-    if (confirmCancel) {
-      await cancelSeat(item.id);
+
+    if (
+      shouldCancel
+    ) {
+
+      cancelSeat(
+        seat.id
+      );
+
     }
 
+
     return;
+
   }
 
 
+  /*
+   * ------------------------------------------
+   * AVAILABLE
+   * ------------------------------------------
+   */
+
   const name =
     prompt(
-      `Bạn đang chọn ghế ${item.label}.\n\nNhập tên của bạn:`
+
+      `Bạn đang chọn ghế ${
+        seat.label
+      }.\n\n` +
+
+      `Nhập tên của bạn:`
+
     );
 
 
@@ -241,17 +498,25 @@ async function handleSeatClick(item) {
     !name ||
     !name.trim()
   ) {
+
     return;
+
   }
 
 
-  await bookSeat(
-    item.id,
+  bookSeat(
+    seat.id,
     name.trim()
   );
 
 }
 
+
+/*
+ * ==================================================
+ * BOOK
+ * ==================================================
+ */
 
 async function bookSeat(
   seatId,
@@ -270,18 +535,31 @@ async function bookSeat(
       await fetch(
         API_URL,
         {
-          method: "POST",
+
+          method:
+            "POST",
 
           headers: {
+
             "Content-Type":
               "text/plain;charset=utf-8"
+
           },
 
-          body: JSON.stringify({
-            action: "book",
-            seatId,
-            name
-          })
+          body:
+            JSON.stringify({
+
+              action:
+                "book",
+
+              seatId:
+                seatId,
+
+              name:
+                name
+
+            })
+
         }
       );
 
@@ -290,8 +568,16 @@ async function bookSeat(
       await response.json();
 
 
-    if (data.status !== "success") {
-      throw new Error(data.message);
+    if (
+      data.status !==
+      "success"
+    ) {
+
+      throw new Error(
+        data.message ||
+        "Không thể đặt ghế."
+      );
+
     }
 
 
@@ -299,23 +585,38 @@ async function bookSeat(
 
 
     showStatus(
-      "Đã đặt ghế thành công!",
+      "🎉 Đã đặt ghế thành công!",
       "success"
+    );
+
+
+    setTimeout(
+      hideStatus,
+      2000
     );
 
 
   } catch (error) {
 
+    console.error(error);
+
+
     showStatus(
-      error.message ||
-      "Không thể đặt ghế.",
-      "danger"
+      "❌ " +
+      error.message,
+      "error"
     );
 
   }
 
 }
 
+
+/*
+ * ==================================================
+ * CANCEL
+ * ==================================================
+ */
 
 async function cancelSeat(
   seatId
@@ -333,687 +634,28 @@ async function cancelSeat(
       await fetch(
         API_URL,
         {
-          method: "POST",
+
+          method:
+            "POST",
 
           headers: {
+
             "Content-Type":
               "text/plain;charset=utf-8"
+
           },
 
-          body: JSON.stringify({
-            action: "cancel",
-            seatId
-          })
-        }
-      );
+          body:
+            JSON.stringify({
 
+              action:
+                "cancel",
 
-    const data =
-      await response.json();
+              seatId:
+                seatId
 
+            })
 
-    if (data.status !== "success") {
-      throw new Error(data.message);
-    }
-
-
-    await loadData();
-
-
-    showStatus(
-      "Đã hủy ghế.",
-      "success"
-    );
-
-
-  } catch (error) {
-
-    showStatus(
-      error.message ||
-      "Không thể hủy ghế.",
-      "danger"
-    );
-
-  }
-
-}
-
-
-/* =====================================================
-   ADMIN LOGIN
-===================================================== */
-
-function openAdminLogin() {
-
-  document.getElementById(
-    "adminPassword"
-  ).value = "";
-
-
-  new bootstrap.Modal(
-    document.getElementById(
-      "adminLoginModal"
-    )
-  ).show();
-
-}
-
-
-async function loginAdmin() {
-
-  const password =
-    document.getElementById(
-      "adminPassword"
-    ).value.trim();
-
-
-  if (!password) {
-    alert("Vui lòng nhập mật khẩu.");
-    return;
-  }
-
-
-  /*
-   * Ta không có API login riêng.
-   * Gửi thử saveConfig với config hiện tại.
-   * Nếu server trả success → password đúng.
-   */
-
-  const response =
-    await fetch(
-      API_URL,
-      {
-        method: "POST",
-
-        headers: {
-          "Content-Type":
-            "text/plain;charset=utf-8"
-        },
-
-        body: JSON.stringify({
-          action: "saveConfig",
-          adminPassword: password,
-          config: appData.config
-        })
-      }
-    );
-
-
-  const data =
-    await response.json();
-
-
-  if (data.status !== "success") {
-
-    alert(
-      "Sai mật khẩu admin."
-    );
-
-    return;
-  }
-
-
-  adminPassword = password;
-
-
-  bootstrap.Modal
-    .getInstance(
-      document.getElementById(
-        "adminLoginModal"
-      )
-    )
-    .hide();
-
-
-  openAdminPanel();
-
-}
-
-
-/* =====================================================
-   ADMIN PANEL
-===================================================== */
-
-function openAdminPanel() {
-
-  renderAdminSections();
-
-  renderSectionEditor();
-
-
-  new bootstrap.Modal(
-    document.getElementById(
-      "adminModal"
-    )
-  ).show();
-
-}
-
-
-function renderAdminSections() {
-
-  const container =
-    document.getElementById(
-      "adminSections"
-    );
-
-  container.innerHTML = "";
-
-
-  getSections().forEach(section => {
-
-    const div =
-      document.createElement("div");
-
-    div.className =
-      "admin-section-item";
-
-
-    if (
-      section.id ===
-      selectedSectionId
-    ) {
-      div.classList.add("active");
-    }
-
-
-    div.innerHTML = `
-      <strong>
-        ${escapeHtml(section.name)}
-      </strong>
-
-      <br>
-
-      <small class="text-muted">
-        ${section.items.length} ghế
-      </small>
-    `;
-
-
-    div.onclick = () => {
-
-      selectedSectionId =
-        section.id;
-
-      renderAdminSections();
-
-      renderSectionEditor();
-
-    };
-
-
-    container.appendChild(div);
-
-  });
-
-}
-
-
-/* =====================================================
-   SECTION EDITOR
-===================================================== */
-
-function renderSectionEditor() {
-
-  const editor =
-    document.getElementById(
-      "sectionEditor"
-    );
-
-
-  if (!selectedSectionId) {
-
-    editor.innerHTML = `
-      <div class="text-muted text-center py-5">
-        Chọn một khu vực để chỉnh sửa.
-      </div>
-    `;
-
-    return;
-  }
-
-
-  const section =
-    getSections()
-      .find(
-        s =>
-          s.id ===
-          selectedSectionId
-      );
-
-
-  if (!section) return;
-
-
-  editor.innerHTML = `
-
-    <div class="admin-editor">
-
-      <h5>
-        ${escapeHtml(section.name)}
-      </h5>
-
-      <hr>
-
-      <div class="mb-3">
-
-        <label class="form-label">
-          Tên khu vực
-        </label>
-
-        <input
-          id="editSectionName"
-          class="form-control"
-          value="${escapeAttribute(section.name)}"
-        >
-
-      </div>
-
-
-      <div class="row">
-
-        <div class="col-md-6">
-
-          <label class="form-label">
-            Số hàng
-          </label>
-
-          <input
-            id="editRows"
-            type="number"
-            min="1"
-            class="form-control"
-            value="${getMaxRow(section)}"
-          >
-
-        </div>
-
-
-        <div class="col-md-6">
-
-          <label class="form-label">
-            Số cột
-          </label>
-
-          <input
-            id="editCols"
-            type="number"
-            min="1"
-            class="form-control"
-            value="${section.maxCol}"
-          >
-
-        </div>
-
-      </div>
-
-
-      <div class="mt-3">
-
-        <button
-          class="btn btn-primary"
-          onclick="generateGrid()"
-        >
-          Tạo lại grid
-        </button>
-
-        <button
-          class="btn btn-outline-danger ms-2"
-          onclick="deleteSection()"
-        >
-          Xóa khu vực
-        </button>
-
-      </div>
-
-
-      <div
-        id="gridPreview"
-        class="admin-preview"
-      ></div>
-
-    </div>
-
-  `;
-
-
-  renderGridPreview(section);
-
-}
-
-
-function getMaxRow(section) {
-
-  return Math.max(
-    ...section.items.map(
-      item =>
-        Number(item.row)
-    ),
-    1
-  );
-
-}
-
-
-/* =====================================================
-   GENERATE GRID
-===================================================== */
-
-function generateGrid() {
-
-  const section =
-    getSections()
-      .find(
-        s =>
-          s.id ===
-          selectedSectionId
-      );
-
-
-  if (!section) return;
-
-
-  const name =
-    document.getElementById(
-      "editSectionName"
-    ).value.trim();
-
-
-  const rows =
-    Number(
-      document.getElementById(
-        "editRows"
-      ).value
-    );
-
-
-  const cols =
-    Number(
-      document.getElementById(
-        "editCols"
-      ).value
-    );
-
-
-  if (
-    !name ||
-    rows < 1 ||
-    cols < 1
-  ) {
-
-    alert(
-      "Thông tin không hợp lệ."
-    );
-
-    return;
-  }
-
-
-  const newItems = [];
-
-
-  for (
-    let row = 1;
-    row <= rows;
-    row++
-  ) {
-
-    for (
-      let col = 1;
-      col <= cols;
-      col++
-    ) {
-
-      const old =
-        section.items.find(
-          item =>
-            Number(item.row) === row &&
-            Number(item.col) === col
-        );
-
-
-      newItems.push({
-
-        id:
-          old?.id ||
-          `${section.id}_${row}_${col}`,
-
-        section_id:
-          section.id,
-
-        section_name:
-          name,
-
-        type:
-          "seat",
-
-        row,
-
-        col,
-
-        label:
-          old?.label ||
-          `${numberToLetter(row)}${col}`,
-
-        enabled:
-          true
-
-      });
-
-    }
-
-  }
-
-
-  /*
-   * Xóa config cũ của section
-   */
-
-  appData.config =
-    appData.config.filter(
-      item =>
-        item.section_id !==
-        section.id
-    );
-
-
-  appData.config.push(
-    ...newItems
-  );
-
-
-  renderAdminSections();
-
-  renderSectionEditor();
-
-}
-
-
-/* =====================================================
-   ADD SECTION
-===================================================== */
-
-function addSection() {
-
-  const id =
-    "SEC_" +
-    Date.now();
-
-
-  appData.config.push({
-
-    id:
-      `${id}_1_1`,
-
-    section_id:
-      id,
-
-    section_name:
-      "Khu vực mới",
-
-    type:
-      "seat",
-
-    row:
-      1,
-
-    col:
-      1,
-
-    label:
-      "A1",
-
-    enabled:
-      true
-
-  });
-
-
-  selectedSectionId =
-    id;
-
-
-  renderAdminSections();
-
-  renderSectionEditor();
-
-}
-
-
-/* =====================================================
-   DELETE SECTION
-===================================================== */
-
-function deleteSection() {
-
-  if (!selectedSectionId)
-    return;
-
-
-  const section =
-    getSections()
-      .find(
-        s =>
-          s.id ===
-          selectedSectionId
-      );
-
-
-  if (
-    !confirm(
-      `Xóa khu vực "${section.name}"?`
-    )
-  ) {
-    return;
-  }
-
-
-  appData.config =
-    appData.config.filter(
-      item =>
-        item.section_id !==
-        selectedSectionId
-    );
-
-
-  selectedSectionId =
-    null;
-
-
-  renderAdminSections();
-
-  renderSectionEditor();
-
-}
-
-
-/* =====================================================
-   PREVIEW
-===================================================== */
-
-function renderGridPreview(section) {
-
-  const preview =
-    document.getElementById(
-      "gridPreview"
-    );
-
-
-  if (!preview) return;
-
-
-  preview.innerHTML = `
-    <strong>
-      Preview
-    </strong>
-
-    <div
-      class="preview-grid mt-3"
-      style="
-        grid-template-columns:
-        repeat(${section.maxCol}, 55px);
-      "
-    >
-
-      ${section.items.map(item => `
-        <div
-          class="preview-seat"
-          style="
-            grid-column:${item.col};
-            grid-row:${item.row};
-          "
-        >
-          ${escapeHtml(item.label)}
-        </div>
-      `).join("")}
-
-    </div>
-  `;
-
-}
-
-
-/* =====================================================
-   SAVE LAYOUT
-===================================================== */
-
-async function saveLayout() {
-
-  if (!adminPassword) {
-
-    alert(
-      "Phiên admin đã hết."
-    );
-
-    return;
-  }
-
-
-  try {
-
-    const response =
-      await fetch(
-        API_URL,
-        {
-          method: "POST",
-
-          headers: {
-            "Content-Type":
-              "text/plain;charset=utf-8"
-          },
-
-          body: JSON.stringify({
-
-            action:
-              "saveConfig",
-
-            adminPassword:
-              adminPassword,
-
-            config:
-              appData.config
-
-          })
         }
       );
 
@@ -1028,34 +670,469 @@ async function saveLayout() {
     ) {
 
       throw new Error(
-        data.message
+        data.message ||
+        "Không thể hủy ghế."
       );
 
     }
 
 
-    alert(
-      "Đã lưu cấu trúc thành công."
+    await loadData();
+
+
+    showStatus(
+      "🗑️ Đã hủy ghế.",
+      "success"
     );
+
+
+    setTimeout(
+      hideStatus,
+      1500
+    );
+
+
+  } catch (error) {
+
+    console.error(error);
+
+
+    showStatus(
+      "❌ " +
+      error.message,
+      "error"
+    );
+
+  }
+
+}
+
+
+/*
+ * ==================================================
+ * ADMIN LOGIN
+ * ==================================================
+ */
+
+function openAdminLogin() {
+
+  document
+    .getElementById(
+      "adminPassword"
+    )
+    .value = "";
+
+
+  document
+    .getElementById(
+      "loginModal"
+    )
+    .classList.add(
+      "show"
+    );
+
+}
+
+
+function closeAdminLogin() {
+
+  document
+    .getElementById(
+      "loginModal"
+    )
+    .classList.remove(
+      "show"
+    );
+
+}
+
+
+/*
+ * ==================================================
+ * LOGIN ADMIN
+ * ==================================================
+ */
+
+async function loginAdmin() {
+
+  const password =
+    document
+      .getElementById(
+        "adminPassword"
+      )
+      .value
+      .trim();
+
+
+  if (!password) {
+
+    alert(
+      "Vui lòng nhập mật khẩu."
+    );
+
+    return;
+
+  }
+
+
+  try {
+
+    const response =
+      await fetch(
+        API_URL,
+        {
+
+          method:
+            "POST",
+
+          headers: {
+
+            "Content-Type":
+              "text/plain;charset=utf-8"
+
+          },
+
+          body:
+            JSON.stringify({
+
+              action:
+                "loginAdmin",
+
+              password:
+                password
+
+            })
+
+        }
+      );
+
+
+    const data =
+      await response.json();
+
+
+    if (
+      data.status !==
+      "success"
+    ) {
+
+      alert(
+        "Sai mật khẩu admin."
+      );
+
+      return;
+
+    }
+
+
+    adminPassword =
+      password;
+
+
+    closeAdminLogin();
+
+
+    openAdminPanel();
+
+
+  } catch (error) {
+
+    console.error(error);
+
+
+    alert(
+      "Không thể kết nối server."
+    );
+
+  }
+
+}
+
+
+/*
+ * ==================================================
+ * OPEN ADMIN PANEL
+ * ==================================================
+ */
+
+function openAdminPanel() {
+
+  renderAdmin();
+
+
+  document
+    .getElementById(
+      "adminModal"
+    )
+    .classList.add(
+      "show"
+    );
+
+}
+
+
+function closeAdminPanel() {
+
+  document
+    .getElementById(
+      "adminModal"
+    )
+    .classList.remove(
+      "show"
+    );
+
+}
+
+
+/*
+ * ==================================================
+ * ADMIN RENDER
+ * ==================================================
+ */
+
+function renderAdmin() {
+
+  const container =
+    document
+      .getElementById(
+        "adminSections"
+      );
+
+
+  container.innerHTML = "";
+
+
+  const sections =
+    groupSections(
+      appData.config
+    );
+
+
+  sections.forEach(
+    section => {
+
+      const wrapper =
+        document.createElement(
+          "div"
+        );
+
+
+      wrapper.className =
+        "admin-section";
+
+
+      const header =
+        document.createElement(
+          "div"
+        );
+
+
+      header.className =
+        "admin-section-header";
+
+
+      const title =
+        document.createElement(
+          "strong"
+        );
+
+
+      title.textContent =
+        section.name;
+
+
+      header.appendChild(
+        title
+      );
+
+
+      wrapper.appendChild(
+        header
+      );
+
+
+      const grid =
+        document.createElement(
+          "div"
+        );
+
+
+      grid.className =
+        "admin-grid";
+
+
+      section.seats.forEach(
+        seat => {
+
+          const button =
+            document.createElement(
+              "button"
+            );
+
+
+          button.className =
+            "admin-seat";
+
+
+          button.textContent =
+            seat.label;
+
+
+          button.onclick =
+            () => {
+
+              const newLabel =
+                prompt(
+                  "Tên ghế:",
+                  seat.label
+                );
+
+
+              if (
+                newLabel &&
+                newLabel.trim()
+              ) {
+
+                seat.label =
+                  newLabel.trim();
+
+              }
+
+
+              renderAdmin();
+
+            };
+
+
+          grid.appendChild(
+            button
+          );
+
+        }
+      );
+
+
+      wrapper.appendChild(
+        grid
+      );
+
+
+      container.appendChild(
+        wrapper
+      );
+
+    }
+  );
+
+}
+
+
+/*
+ * ==================================================
+ * SAVE ADMIN CONFIG
+ * ==================================================
+ */
+
+async function saveAdminConfig() {
+
+  if (
+    !adminPassword
+  ) {
+
+    alert(
+      "Phiên admin đã hết."
+    );
+
+    return;
+
+  }
+
+
+  showStatus(
+    "Đang lưu cấu trúc...",
+    "info"
+  );
+
+
+  try {
+
+    const response =
+      await fetch(
+        API_URL,
+        {
+
+          method:
+            "POST",
+
+          headers: {
+
+            "Content-Type":
+              "text/plain;charset=utf-8"
+
+          },
+
+          body:
+            JSON.stringify({
+
+              action:
+                "saveConfig",
+
+              adminPassword:
+                adminPassword,
+
+              config:
+                appData.config
+
+            })
+
+        }
+      );
+
+
+    const data =
+      await response.json();
+
+
+    if (
+      data.status !==
+      "success"
+    ) {
+
+      throw new Error(
+        data.message ||
+        "Không thể lưu."
+      );
+
+    }
+
+
+    closeAdminPanel();
 
 
     await loadData();
 
 
-    bootstrap.Modal
-      .getInstance(
-        document.getElementById(
-          "adminModal"
-        )
-      )
-      .hide();
+    showStatus(
+      "💾 Đã lưu cấu trúc phòng.",
+      "success"
+    );
+
+
+    setTimeout(
+      hideStatus,
+      2000
+    );
 
 
   } catch (error) {
 
-    alert(
-      error.message ||
-      "Không thể lưu."
+    console.error(error);
+
+
+    showStatus(
+      "❌ " +
+      error.message,
+      "error"
     );
 
   }
@@ -1063,80 +1140,42 @@ async function saveLayout() {
 }
 
 
-/* =====================================================
-   UTILITIES
-===================================================== */
-
-function numberToLetter(number) {
-
-  let result = "";
-
-  while (number > 0) {
-
-    const remainder =
-      (number - 1) % 26;
-
-    result =
-      String.fromCharCode(
-        65 + remainder
-      ) + result;
-
-    number =
-      Math.floor(
-        (number - 1) / 26
-      );
-
-  }
-
-  return result;
-
-}
-
-
-function escapeHtml(value) {
-
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-
-}
-
-
-function escapeAttribute(value) {
-
-  return escapeHtml(value);
-
-}
-
+/*
+ * ==================================================
+ * STATUS
+ * ==================================================
+ */
 
 function showStatus(
   message,
   type
 ) {
 
-  const el =
+  const element =
     document.getElementById(
-      "statusMsg"
+      "status"
     );
 
 
-  el.className =
-    `alert alert-${type} text-center`;
-
-
-  el.textContent =
+  element.textContent =
     message;
+
+
+  element.className =
+    "status show " +
+    type;
 
 }
 
 
 function hideStatus() {
 
-  document.getElementById(
-    "statusMsg"
-  ).classList.add("d-none");
+  document
+    .getElementById(
+      "status"
+    )
+    .classList.remove(
+      "show"
+    );
 
 }
